@@ -9,8 +9,10 @@ import md5
 if sys.path[1].find('neteaseDebug') == -1:
     sys.path[1:1] = [os.path.abspath("e:\\neteaseDebug")]
 import simplejson as json
+usePc=0
 try:
-    from Crypto.Cipher import AES
+    import pyaes as AES
+    usePc=1
 except:
     import aes as AES
 import random
@@ -20,6 +22,8 @@ import StringIO
 import httplib
 import urllib
 import socket
+
+baseUrl='http://music.wmm521.cn:3000/'
 
 try:
     import appuifw2 as appuifw
@@ -57,16 +61,26 @@ def writeProg(n,s,t):
 def cookie2Dict(str1):return dict([(x.replace(' ','').split('=') + [''])[0:2] for x in re.split(',|;', str1)])
 def dict2Cookie(dict1):return ';'.join([a + '=' + b for a,b in dict1.items()])
 def aesEncrypt(text, secKey):
+    t = type(text)
+    if(type(text)==type(u"")):
+        text = text.encode('u8')
     pad = 16 - len(text) % 16
     text = text + pad * chr(pad)
     # encryptor = AES.new(secKey, 2, '0102030405060708')
     # ciphertext = encryptor.encrypt(text)
     # ciphertext = base64.b64encode(ciphertext)
     # return ciphertext.decode()
-    encryptor = AES.new(secKey, 2, '0102030405060708')
-    ciphertext = encryptor.encrypt(text)
-    ciphertext = base64.encodestring(ciphertext).replace('\n','')
-    return ciphertext.decode()
+    if(usePc):
+        encrypter = AES.Encrypter(AES.AESModeOfOperationCBC(secKey, '0102030405060708'))
+        ciphertext = encrypter.feed(text)
+        ciphertext += encrypter.feed()
+        ciphertext = base64.encodestring(ciphertext).replace('\n', '')
+        return ciphertext.decode()
+    else:
+        encryptor = AES.new(secKey, 2, '0102030405060708')
+        ciphertext = encryptor.encrypt(text)
+        ciphertext = base64.encodestring(ciphertext).replace('\n','')
+        return ciphertext.decode()
 
 def modpow(base, exponent, mod):
     ans = 1
@@ -92,7 +106,7 @@ def createSecretKey(size):
     return ''.join( [ hex(random.randint(1,255))[2:] for x in range(16) ] )[0:16]
 
 def getParams(paramsData):
-    modulus = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7'
+    modulus = 'E0B509F6259DF8642DBC35662901477DF22677EC152B5FF68ACE615BB7B725152B3AB17A876AEA8A5AA76D2E417629EC4EE341F56135FCCF695280104E0312ECBDA92557C93870114AF6C9D05C4F7F0C3685B7A46BEE255932575CCE10B424D813CFE4875D3E82047B97DDEF52741D546B8E289DC6935B3ECE0462DB0A22B8E7'
     nonce = '0CoJUm6Qyw8W8jud'
     pubKey = '010001'
     text = json.dumps(paramsData)
@@ -170,6 +184,8 @@ class NEApi:
         self.uid=0
         self.cookie = INIT_COOKIE
         self.updateCookie(self.loadCookie())
+        data = json.loads(self.loadUserdata())
+        self.updateUid(data)
         self.netFailedCallback = lambda:None
         self.loginSucceed = False
         self.httpResponseCallback = downProg
@@ -188,21 +204,35 @@ class NEApi:
                     printException(Exception, e, cn('在登录时出现了一些问题。用户名或密码错误吗？'))
                     break
                 if self.checkLogin():
-
                     break
-    
+    def ProcessCookie(self,ck):
+        cks = ck.split('Domain=.music.163.com, ')
+        t = ''
+        for c in cks:
+            t = c.find('MUSIC_U')
+            if (t > -1):
+                c2 = c[t:].split(';')[0]
+                return c2 + ';'
+        return ''
+
     def updateCookie(self, str1):
+        str1 = self.ProcessCookie(str1)
         self.cookie = INIT_COOKIE + str1
-        reFind = re.findall(r'(?<=NETEASE\_WDA\_UID=).*(?=#\|)',str1)
-        if reFind:
-            self.uid=reFind[0]
-        else:
-            self.uid=0
+        #reFind = re.findall(r'(?<=NETEASE\_WDA\_UID=).*(?=#\|)',str1)
+        #if reFind:
+        #    self.uid=reFind[0]
+        #else:
+        #    self.uid=0
     
     def rawHttpReq(self, url, method='GET', params='', query='', header=None):
     #发HTTP请求，并返回cookie内容和正文
         if header == None:
-            header = {'Cookie': self.cookie, 'Referer': 'http://music.163.com/', 'Content-Type':"application/x-www-form-urlencoded"}
+            header = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.30 Safari/537.36',
+                    'Cookie': self.cookie,
+                      'Referer': 'http://music.163.com/',
+                      'Content-Type':"application/x-www-form-urlencoded"
+                      }
         urlhost = url.split('/')[2]
         httpLogs(cn('<Request URI> ') + cn(url))
         httpLogs(cn('<Request Body> ') + cn(params))
@@ -218,6 +248,7 @@ class NEApi:
             result = (resp1.getheader('set-cookie'), responseData.read())
             httpLogs(cn('<Response Cookie> \n') + cn(result[0]))
             httpLogs(cn('<Response Body> \n   Length: ') + unicode(len(result[1])))
+            httpLogs(cn('<Response Body> \n  : ') + result[1].decode('u8'))
             conn1.close()
             return result
         except Exception, e:
@@ -231,7 +262,9 @@ class NEApi:
     #针对网易云网页版新API发加密的POST
         httpLogs(cn('<Encryped Data> ') + cn(urllib.urlencode(params)))
         encParams = getParams(params)
-        return self.rawHttpReq(url, "POST", urllib.urlencode(encParams))
+        data=urllib.urlencode(encParams)
+        ret=self.rawHttpReq(url, "POST",data )
+        return ret
     
     def loadCookie(self):
     #从默认位置载入COOKIE
@@ -249,11 +282,28 @@ class NEApi:
         file1.write(self.cookie)
         file1.close()
         return None
-        
+
+    def loadUserdata(self):
+        if not os.path.exists('e:\\netease\\data\\userdata.txt'):
+            file0 = open('e:\\netease\\data\\userdata.txt', 'w')
+            file0.write('{}')
+            file0.close()
+        file1 = open('e:\\netease\\data\\userdata.txt', 'r')
+        data = file1.read()
+        file1.close()
+        return data
+
+    def writeUserdata(self,data):
+        file1=open('e:\\netease\\data\\userdata.txt','w')
+        file1.write(json.dumps(data))
+        file1.close()
+        return None
+
     def checkLogin(self):
         #通过检查个人推荐页的结果是否为200来判定是否登录成功，<并且通过UID检测判断是否同一账号>
+        #2022-11-28更新，直接获取用户状态，account不为空是登录成功
         try:
-            if json.loads(self.encHttpReq(HOST+'/weapi/v1/discovery/recommend/songs?csrf_token=', {'':''})[1]).get('code') == 200:
+            if json.loads(self.encHttpReq(HOST+'/weapi/w/nuser/account/get', {'':''})[1]).get('account') != None:
                 self.loginSucceed = True
                 return True
                 
@@ -269,6 +319,7 @@ class NEApi:
         m = md5.new()
         m.update(password.encode())
         pwEnc=m.hexdigest()
+
         loginDict = {
             'username': username,
             'password': pwEnc,
@@ -281,7 +332,7 @@ class NEApi:
                 'password': pwEnc,
                 'rememberLogin': 'true'
             }
-            loginUrl = loginUrl + '/cellphone'
+            loginUrl = loginUrl + 'cellphone'
         loginCount = 0
         while loginSuc == False:
             if loginCount >= 5:
@@ -299,7 +350,7 @@ class NEApi:
                     if captCount >= 5:
                         raise Exception, 'Login Failed. IP Frequent and Many Wrong Captcha'
                         break
-                    download(HOST + '/captcha?id=' + loginReads['captchaId'], 'E:\\netease\\data\\captcha.png')
+                    download(HOST + '/captcha?id=' + loginReads['captchaId'], 'E:\\netease\\data\\captcha.png',ck=self.cookie)
                     inputCapt = appuifw.query(cn('请输入E:\\netease\\data\\captcha.png中的验证码：'), 
                      'text')
                     captReads = self.encHttpReq(HOST + '/weapi/image/captcha/verify/hf', {'id': loginReads['captchaId'] , 'captcha': inputCapt})[1]
@@ -310,9 +361,17 @@ class NEApi:
                 loginSuc = True
             else:
                 raise Exception, 'Login Failed. Wrong Username or Password?'
+        self.updateUid(loginReads)
         self.updateCookie(INIT_COOKIE + loginCookie)
         self.writeCookie()
+        self.writeUserdata(loginReads)
         return None
+    def updateUid(self,data):
+        if('account' in data and 'id' in data['account']):
+            self.uid = data['account']['id']
+        else:
+            self.uid = 0
+
     def dailySign(self):
         try:
             signUrl = HOST + '/weapi/point/dailyTask'
@@ -378,14 +437,14 @@ class NEApi:
         
         try:
             plPath = u'e:\\netease\\cache\\playlist\\playlist_%s.txt'%plId
-            plUrl = HOST + '/api/playlist/detail?id=%s' % (plId)
-            if not useDownload:return json.loads(self.rawHttpReq(plUrl)[1])['result']
+            plUrl = HOST + '/api/v6/playlist/detail?id=%s' % (plId)
+            if not useDownload:return json.loads(self.rawHttpReq(plUrl)[1])['playlist']
             
             if forceRefresh or not(os.path.exists(plPath)):
-                download(plUrl, plPath, downProg, lambda:None, writeProg)
+                download(plUrl, plPath, downProg, lambda:None, writeProg,ck=self.cookie)
             infoPopup.hide()
             file1 = open(plPath, 'r')
-            content = json.loads(file1.read())['result']
+            content = json.loads(file1.read())['playlist']
             file1.close()
             return content
             
@@ -728,3 +787,7 @@ class NEApi:
     def rawgetAlbum(self, albumId):
         albumUrl = HOST + '/api/album/%s?id=%s' % (albumId, albumId)
         return self.rawHttpReq(albumUrl)[1]
+
+if __name__ == '__main__':
+    newapi = NEApi('123123','123123',True,True)
+

@@ -12,7 +12,7 @@ except:
     pass
 
 HOST = 'http://music.163.com'
-INIT_COOKIE = 'appver=2.7.1;'
+INIT_COOKIE = 'os=pc;appver=2.9.8;'
 modulus = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7'
 nonce = '0CoJUm6Qyw8W8jud'
 pubKey = '010001'
@@ -114,7 +114,7 @@ def printException(Exception, e, str1=''):
         # aolock.signal()
         # appuifw.app.set_exit()
     
-def download(objUrl, objPath, callBack = None, errBack = lambda:None, writeCallBack = None):
+def download(objUrl, objPath, callBack = None, errBack = lambda:None, writeCallBack = None,ck=None):
     succeed = False
     retryCount = 0
     # while((not succeed) and retryCount < 4):
@@ -127,7 +127,7 @@ def download(objUrl, objPath, callBack = None, errBack = lambda:None, writeCallB
                 # logs(repr(Exception) + ': ' + repr(e))
                 # traceback.print_exc()
             httpLogs(cn('<Download> ') + cn(objUrl) + cn(' To: ') + cn(objPath))
-            httpDownload(objUrl, objPath, callBack, writeCallBack)
+            httpDownload(objUrl, objPath, callBack, writeCallBack,ck=ck)
             logs(u'Download Succeed')
             succeed = True
         except Exception, e:
@@ -152,11 +152,16 @@ def download(objUrl, objPath, callBack = None, errBack = lambda:None, writeCallB
         # appuifw.note(cn('出现网络问题，下载持续出现错误。请检查网络，并重新启动程序。'))
         # appuifw.app.set_exit()
         
-def httpDownload(objUrl, objPath, callBack = None, writeCallBack = None, bs = 8*1024, writebs = 512 * 1024):
+def httpDownload(objUrl, objPath, callBack = None, writeCallBack = None, bs = 8*1024, writebs = 512 * 1024,ck=None):
     try:
         urlhost = objUrl.split('/')[2]
         conn1 = httplib.HTTPConnection(urlhost,80,3)
-        conn1.request('GET',objUrl,'',{})
+        hd={}
+        if(ck!=None):
+            hd={
+                'Cookie':ck
+            }
+        conn1.request('GET',objUrl,'', hd)
         responseIO=conn1.getresponse()
         logs('Downloading From ' + objUrl)
         if responseIO.status == 302 or bool(responseIO.getheader('Location')):

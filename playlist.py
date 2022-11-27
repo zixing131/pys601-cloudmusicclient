@@ -282,13 +282,20 @@ class Playlist:
             size = self.picSize
         logs('Start Fetching Pic')
         #根据当前播放的歌曲，返回专辑图片的路径，有必要时下载
-        
-        picPath =u'e:\\netease\\pic\\%s.png' % self.listdetail[self.songIndex]['album']['id']
+        album=None
+        if('album' in  self.listdetail[self.songIndex]):
+            album = self.listdetail[self.songIndex]['album']
+        elif('al' in  self.listdetail[self.songIndex]):
+            album = self.listdetail[self.songIndex]['al']
+        else:
+            logs( 'Error Fetching Pic' )
+            return
+        picPath =u'e:\\netease\\pic\\%s.png' % album['id']
         
         if not os.path.exists(picPath):
-            picUrl = self.listdetail[self.songIndex]['album']['picUrl'] + '?param=%iy%i' % (size, size)
+            picUrl = album['picUrl'] + '?param=%iy%i' % (size, size)
             logs('Start Downloading Pic at %s to %s' % (picUrl, picPath))
-            strList = [ cn('下载专辑图片 ') + cn(self.listdetail[self.songIndex]['album']['name']) , cn('目标: ') + cn(picPath.split('\\')[-1]) ]
+            strList = [ cn('下载专辑图片 ') + cn(album['name']) , cn('目标: ') + cn(picPath.split('\\')[-1]) ]
             strList2 = [ cn('写入文件') ]
             download(picUrl, picPath, self.downCallbackWrapper(strList), self.errCallback, self.writeCallbackWrapper(strList2))
         logs( 'End Fetching Pic' )
