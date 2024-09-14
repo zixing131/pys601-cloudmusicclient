@@ -490,7 +490,7 @@ class NEApi:
         songsDetailRes = json.loads(self.rawgetSongsUrl(songIds, br))['data']
         songsDetailRes_ = copy.copy(songsDetailRes)
         for x in songsDetailRes:
-            i = songIds.index(int(x['id']))
+            i = songIds.index(long(x['id']))
             #待写
             songsDetailRes_[i] = x
         return songsDetailRes_
